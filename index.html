@@ -23,13 +23,11 @@
         .keyword:active {
             cursor: grabbing;
         }
-        /* 키워드 클릭 선택 시 스타일 */
         .keyword.selected {
             transform: scale(1.1);
             box-shadow: 0 0 15px rgba(255, 167, 38, 0.8);
             border: 2px solid #FFA726;
         }
-        /* 드래그 중인 유령 이미지 스타일 */
         .dragging-clone {
             pointer-events: none;
             position: absolute;
@@ -39,17 +37,21 @@
             z-index: 1000;
         }
         .bingo-cell {
-            width: 100px;
-            height: 100px;
+            /* width/height 제거 -> 그리드가 크기를 제어하도록 함 */
+            aspect-ratio: 1 / 1; /* 정사각형 비율 유지 */
             border: 2px dashed #FFCC80; /* 주황색 점선 */
             transition: background-color 0.2s ease, transform 0.2s ease;
             display: flex;
             justify-content: center;
             align-items: center;
+            text-align: center;
             font-weight: 700;
-            font-size: 1rem;
+            /* 반응형 폰트 크기 설정 */
+            font-size: clamp(0.6rem, 2.5vw, 1rem);
             color: #424242;
             position: relative;
+            word-break: keep-all; /* 단어 중간에 잘리는 현상 방지 */
+            padding: 2px;
         }
         .bingo-cell.drag-over {
             background-color: #FFE0B2; /* 연한 주황색 */
@@ -90,14 +92,14 @@
         }
     </style>
 </head>
-<body class="main-bg min-h-screen flex flex-col items-center justify-center p-4">
+<body class="main-bg min-h-screen flex flex-col items-center justify-center p-2 sm:p-4">
 
     <div class="w-full max-w-4xl mx-auto">
         <h1 class="text-3xl md:text-4xl font-bold text-center text-orange-700 mb-6">🔥 연소와 소화 빙고 게임 💧</h1>
 
-        <div class="flex flex-col lg:flex-row gap-8 items-start">
+        <div class="flex flex-col lg:flex-row gap-4 md:gap-8 items-start">
 
-            <div id="controls-panel" class="w-full lg:w-1/3 bg-white p-6 rounded-2xl shadow-lg">
+            <div id="controls-panel" class="w-full lg:max-w-xs xl:max-w-sm bg-white p-4 md:p-6 rounded-2xl shadow-lg">
                 <div id="keyword-bank-container">
                     <h2 class="text-xl font-bold text-gray-700 mb-3">핵심 단어 (24개)</h2>
                     <p class="text-sm text-gray-500 mb-4">단어를 끌어다 놓거나, 단어 클릭 후 빈칸을 클릭하여 빙고판을 완성하세요!</p>
@@ -114,8 +116,8 @@
                 <button id="reset-btn" class="btn w-full bg-gray-400 text-white font-bold py-3 px-4 rounded-lg mt-4">다시 만들기</button>
             </div>
 
-            <div class="w-full lg:w-2/3 flex-grow">
-                <div id="bingo-board" class="grid grid-cols-5 gap-2 bg-white p-4 rounded-2xl shadow-lg aspect-square"></div>
+            <div class="w-full lg:w-auto flex-grow flex justify-center">
+                <div id="bingo-board" class="grid grid-cols-5 gap-1 sm:gap-2 bg-white p-2 sm:p-4 rounded-2xl shadow-lg w-full max-w-lg aspect-square"></div>
             </div>
         </div>
     </div>
@@ -188,7 +190,7 @@
             availableKeywords.forEach(word => {
                 const keywordEl = document.createElement('div');
                 keywordEl.textContent = word;
-                keywordEl.classList.add('keyword', 'bg-gray-100', 'p-2', 'rounded-md', 'shadow-sm', 'text-sm', 'font-semibold', 'text-gray-700');
+                keywordEl.classList.add('keyword', 'bg-gray-100', 'p-2', 'rounded-md', 'shadow-sm', 'text-xs', 'sm:text-sm', 'font-semibold', 'text-gray-700');
                 keywordEl.draggable = true;
                 keywordEl.dataset.keyword = word;
                 keywordBank.appendChild(keywordEl);
