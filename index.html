@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>연소와 소화 빙고 게임</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans KR', sans-serif;
+            touch-action: manipulation;
+        }
+        .main-bg {
+            background-color: #FFF8E1; /* 부드러운 크림색 배경 */
+        }
+        .keyword {
+            cursor: grab;
+            transition: all 0.2s ease-in-out;
+            touch-action: none; /* 터치 스크롤 방지 */
+            user-select: none; /* 텍스트 선택 방지 */
+        }
+        .keyword:active {
+            cursor: grabbing;
+        }
+        /* 키워드 클릭 선택 시 스타일 */
+        .keyword.selected {
+            transform: scale(1.1);
+            box-shadow: 0 0 15px rgba(255, 167, 38, 0.8);
+            border: 2px solid #FFA726;
+        }
+        /* 드래그 중인 유령 이미지 스타일 */
+        .dragging-clone {
+            pointer-events: none;
+            position: absolute;
+            opacity: 0.8;
+            transform: scale(1.1);
+            box-shadow: 0 8px 20px rgba(0,0,0,0.2);
+            z-index: 1000;
+        }
+        .bingo-cell {
+            width: 100px;
+            height: 100px;
+            border: 2px dashed #FFCC80; /* 주황색 점선 */
+            transition: background-color 0.2s ease, transform 0.2s ease;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 700;
+            font-size: 1rem;
+            color: #424242;
+            position: relative;
+        }
+        .bingo-cell.drag-over {
+            background-color: #FFE0B2; /* 연한 주황색 */
+            transform: scale(1.05);
+        }
+        .bingo-cell.filled {
+            border-style: solid;
+            border-color: #FFA726; /* 진한 주황색 */
+            background-color: #FFF;
+        }
+        .bingo-cell.marked {
+            background-color: #FFA726;
+            color: white;
+            transform: rotate(3deg) scale(1.05);
+        }
+        .bingo-cell.win-line {
+            background-color: #E65100; /* 강조된 주황색 */
+            animation: bounce 0.5s;
+        }
+        @keyframes bounce {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.2); }
+        }
+        .btn {
+            transition: all 0.2s ease;
+        }
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+        }
+        .modal {
+            transition: opacity 0.3s ease, transform 0.3s ease, visibility 0.3s;
+        }
+        .modal.hidden {
+            opacity: 0;
+            transform: scale(0.95);
+            visibility: hidden;
+        }
+    </style>
+</head>
+<body class="main-bg min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div class="w-full max-w-4xl mx-auto">
+        <h1 class="text-3xl md:text-4xl font-bold text-center text-orange-700 mb-6">🔥 연소와 소화 빙고 게임 💧</h1>
+
+        <div class="flex flex-col lg:flex-row gap-8 items-start">
+
+            <div id="controls-panel" class="w-full lg:w-1/3 bg-white p-6 rounded-2xl shadow-lg">
+                <div id="keyword-bank-container">
+                    <h2 class="text-xl font-bold text-gray-700 mb-3">핵심 단어 (24개)</h2>
+                    <p class="text-sm text-gray-500 mb-4">단어를 끌어다 놓거나, 단어 클릭 후 빈칸을 클릭하여 빙고판을 완성하세요!</p>
+                    <div id="keyword-bank" class="flex flex-wrap gap-2 justify-center"></div>
+                </div>
+                <div id="game-play-container" class="hidden text-center">
+                     <h2 class="text-xl font-bold text-gray-700 mb-3">단어 뽑기 (교사용)</h2>
+                     <div class="bg-orange-100 p-4 rounded-lg min-h-[80px] flex items-center justify-center mb-4">
+                        <span id="called-word" class="text-2xl font-bold text-orange-600">준비!</span>
+                     </div>
+                     <button id="next-word-btn" class="btn w-full bg-orange-500 text-white font-bold py-3 px-4 rounded-lg">다음 단어 뽑기</button>
+                </div>
+                <button id="start-game-btn" class="btn w-full bg-green-500 text-white font-bold py-3 px-4 rounded-lg mt-4 hidden">빙고 게임 시작!</button>
+                <button id="reset-btn" class="btn w-full bg-gray-400 text-white font-bold py-3 px-4 rounded-lg mt-4">다시 만들기</button>
+            </div>
+
+            <div class="w-full lg:w-2/3 flex-grow">
+                <div id="bingo-board" class="grid grid-cols-5 gap-2 bg-white p-4 rounded-2xl shadow-lg aspect-square"></div>
+            </div>
+        </div>
+    </div>
+    
+    <div id="bingo-modal" class="modal hidden fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50">
+        <div class="bg-white rounded-2xl p-8 text-center shadow-2xl">
+            <h2 class="text-4xl font-bold text-orange-500 mb-4 animate-bounce">🎉 5 빙고! 🎉</h2>
+            <p class="text-gray-700 text-lg mb-6">축하합니다! 5줄 빙고를 완성했어요!</p>
+            <button id="modal-reset-btn" class="btn w-full bg-orange-500 text-white font-bold py-3 px-4 rounded-lg">새로운 게임하기</button>
+            <button id="modal-close-btn" class="btn w-full bg-gray-400 text-white font-bold py-3 px-4 rounded-lg mt-2">판 확인하기</button>
+        </div>
+    </div>
+
+    <script>
+        const keywords = ["연소", "산소", "탈 물질", "발화점", "소화", "물", "이산화 탄소", "모래", "소화기", "질식 소화", "냉각 소화", "제거 소화", "화재", "안전", "대피", "플러그", "가스 밸브", "염화 코발트 종이", "석회수", "빛", "열", "심지", "성냥", "뚜껑"];
+
+        // DOM Elements
+        const keywordBank = document.getElementById('keyword-bank');
+        const bingoBoard = document.getElementById('bingo-board');
+        const startGameBtn = document.getElementById('start-game-btn');
+        const resetBtn = document.getElementById('reset-btn');
+        const nextWordBtn = document.getElementById('next-word-btn');
+        const keywordBankContainer = document.getElementById('keyword-bank-container');
+        const gamePlayContainer = document.getElementById('game-play-container');
+        const calledWordEl = document.getElementById('called-word');
+        const bingoModal = document.getElementById('bingo-modal');
+        const modalResetBtn = document.getElementById('modal-reset-btn');
+        const modalCloseBtn = document.getElementById('modal-close-btn');
+
+        // Game State
+        let availableKeywords = [];
+        let boardState;
+        let gameEnded;
+        
+        // Drag & Drop State
+        let draggedKeywordEl = null;
+        let draggingClone = null;
+        let selectedKeywordForClick = null;
+
+        function shuffle(array) {
+            for (let i = array.length - 1; i > 0; i--) {
+                const j = Math.floor(Math.random() * (i + 1));
+                [array[i], array[j]] = [array[j], array[i]];
+            }
+            return array;
+        }
+
+        function initGame() {
+            // Reset states
+            boardState = Array.from({ length: 5 }, () => Array.from({ length: 5 }, () => ({ text: null, marked: false })));
+            gameEnded = false;
+            availableKeywords = shuffle([...keywords]);
+            
+            // Reset DOM
+            keywordBank.innerHTML = '';
+            bingoBoard.innerHTML = '';
+            
+            // Reset UI visibility and states
+            nextWordBtn.disabled = false;
+            keywordBankContainer.classList.remove('hidden');
+            gamePlayContainer.classList.add('hidden');
+            startGameBtn.classList.add('hidden');
+            calledWordEl.textContent = '준비!';
+            if (selectedKeywordForClick) {
+                selectedKeywordForClick.classList.remove('selected');
+                selectedKeywordForClick = null;
+            }
+
+            // Create Keywords
+            availableKeywords.forEach(word => {
+                const keywordEl = document.createElement('div');
+                keywordEl.textContent = word;
+                keywordEl.classList.add('keyword', 'bg-gray-100', 'p-2', 'rounded-md', 'shadow-sm', 'text-sm', 'font-semibold', 'text-gray-700');
+                keywordEl.draggable = true;
+                keywordEl.dataset.keyword = word;
+                keywordBank.appendChild(keywordEl);
+            });
+            
+            // Create Bingo Board
+            for (let i = 0; i < 25; i++) {
+                const cell = document.createElement('div');
+                cell.classList.add('bingo-cell');
+                cell.dataset.row = Math.floor(i / 5);
+                cell.dataset.col = i % 5;
+                if (i === 12) {
+                    cell.textContent = "⭐️";
+                    cell.classList.add('filled', 'marked');
+                    boardState[2][2] = { text: '⭐️', marked: true };
+                }
+                bingoBoard.appendChild(cell);
+            }
+            setupEventListeners();
+        }
+        
+        function placeKeyword(cell, keyword) {
+            if (cell.classList.contains('filled')) return;
+            
+            const row = parseInt(cell.dataset.row);
+            const col = parseInt(cell.dataset.col);
+            
+            cell.textContent = keyword;
+            cell.classList.add('filled');
+            boardState[row][col] = { text: keyword, marked: false };
+            
+            const keywordElInBank = keywordBank.querySelector(`[data-keyword="${keyword}"]`);
+            if (keywordElInBank) keywordElInBank.style.display = 'none';
+
+            // Check if board is full
+            const filledCells = bingoBoard.querySelectorAll('.filled').length;
+            if (filledCells === 25) {
+                startGameBtn.classList.remove('hidden');
+            }
+        }
+
+        function setupEventListeners() {
+            // For click-to-place
+            keywordBank.addEventListener('click', e => {
+                if (e.target.classList.contains('keyword')) {
+                    if (selectedKeywordForClick) {
+                        selectedKeywordForClick.classList.remove('selected');
+                    }
+                    selectedKeywordForClick = e.target;
+                    selectedKeywordForClick.classList.add('selected');
+                }
+            });
+
+            bingoBoard.addEventListener('click', e => {
+                if (e.target.classList.contains('bingo-cell') && selectedKeywordForClick) {
+                    placeKeyword(e.target, selectedKeywordForClick.dataset.keyword);
+                    selectedKeywordForClick.classList.remove('selected');
+                    selectedKeywordForClick = null;
+                }
+            });
+
+            // For Drag and Drop (Mouse)
+            keywordBank.addEventListener('dragstart', e => {
+                if (e.target.classList.contains('keyword')) {
+                    draggedKeywordEl = e.target;
+                }
+            });
+            
+            // For Drag and Drop (Mouse & Touch)
+            const cells = bingoBoard.querySelectorAll('.bingo-cell');
+            cells.forEach(cell => {
+                cell.addEventListener('dragover', e => {
+                    e.preventDefault();
+                    if (!cell.classList.contains('filled')) cell.classList.add('drag-over');
+                });
+                cell.addEventListener('dragleave', () => cell.classList.remove('drag-over'));
+                cell.addEventListener('drop', e => {
+                    e.preventDefault();
+                    cell.classList.remove('drag-over');
+                    if (draggedKeywordEl) {
+                        placeKeyword(cell, draggedKeywordEl.dataset.keyword);
+                        draggedKeywordEl = null;
+                    }
+                });
+            });
+
+            // For Touch Drag and Drop
+            let lastTouchTarget = null;
+            keywordBank.addEventListener('touchstart', e => {
+                if (e.target.classList.contains('keyword')) {
+                    e.preventDefault();
+                    draggedKeywordEl = e.target;
+                    
+                    draggingClone = draggedKeywordEl.cloneNode(true);
+                    draggingClone.classList.add('dragging-clone');
+                    document.body.appendChild(draggingClone);
+                    
+                    const touch = e.targetTouches[0];
+                    draggingClone.style.left = `${touch.clientX - draggingClone.offsetWidth / 2}px`;
+                    draggingClone.style.top = `${touch.clientY - draggingClone.offsetHeight / 2}px`;
+                }
+            }, { passive: false });
+
+            document.addEventListener('touchmove', e => {
+                if (!draggingClone) return;
+                e.preventDefault();
+                const touch = e.targetTouches[0];
+                draggingClone.style.left = `${touch.clientX - draggingClone.offsetWidth / 2}px`;
+                draggingClone.style.top = `${touch.clientY - draggingClone.offsetHeight / 2}px`;
+                
+                const target = document.elementFromPoint(touch.clientX, touch.clientY);
+                if (lastTouchTarget && lastTouchTarget !== target) {
+                    lastTouchTarget.classList.remove('drag-over');
+                }
+                if (target && target.classList.contains('bingo-cell') && !target.classList.contains('filled')) {
+                    target.classList.add('drag-over');
+                    lastTouchTarget = target;
+                } else {
+                    lastTouchTarget = null;
+                }
+            }, { passive: false });
+
+            document.addEventListener('touchend', e => {
+                if (!draggingClone) return;
+
+                if (lastTouchTarget) {
+                    lastTouchTarget.classList.remove('drag-over');
+                    placeKeyword(lastTouchTarget, draggedKeywordEl.dataset.keyword);
+                }
+                
+                document.body.removeChild(draggingClone);
+                draggingClone = null;
+                draggedKeywordEl = null;
+                lastTouchTarget = null;
+            });
+        }
+        
+        function handleStartGame() {
+            keywordBankContainer.classList.add('hidden');
+            gamePlayContainer.classList.remove('hidden');
+            startGameBtn.classList.add('hidden');
+            
+            bingoBoard.querySelectorAll('.bingo-cell.filled').forEach(cell => {
+                if (cell.textContent !== "⭐️") {
+                    cell.addEventListener('click', handleCellClick);
+                }
+            });
+        }
+        
+        function handleCellClick(e) {
+            if (gameEnded) return;
+            const cell = e.currentTarget;
+            cell.classList.toggle('marked');
+            
+            const row = parseInt(cell.dataset.row);
+            const col = parseInt(cell.dataset.col);
+            boardState[row][col].marked = cell.classList.contains('marked');
+            
+            checkBingo();
+        }
+
+        function handleNextWord() {
+            if (availableKeywords.length === 0) {
+                calledWordEl.textContent = "모든 단어!";
+                nextWordBtn.disabled = true;
+                return;
+            }
+            const nextWord = availableKeywords.pop();
+            calledWordEl.textContent = nextWord;
+        }
+        
+        function checkBingo() {
+            document.querySelectorAll('.win-line').forEach(cell => cell.classList.remove('win-line'));
+
+            let bingoCount = 0;
+            const winPatterns = [];
+
+            const checkLine = (line) => line.every(cell => cell.marked);
+            // Check rows
+            for (let i = 0; i < 5; i++) {
+                if (checkLine(boardState[i])) {
+                    bingoCount++;
+                    winPatterns.push(Array.from({length: 5}, (_, j) => ({row: i, col: j})));
+                }
+            }
+            // Check columns
+            for (let j = 0; j < 5; j++) {
+                const colLine = boardState.map(row => row[j]);
+                if (checkLine(colLine)) {
+                    bingoCount++;
+                    winPatterns.push(Array.from({length: 5}, (_, i) => ({row: i, col: j})));
+                }
+            }
+            // Check diagonals
+            const diag1 = boardState.map((row, i) => row[i]);
+            if (checkLine(diag1)) {
+                bingoCount++;
+                winPatterns.push(Array.from({length: 5}, (_, i) => ({row: i, col: i})));
+            }
+            const diag2 = boardState.map((row, i) => row[4 - i]);
+            if (checkLine(diag2)) {
+                bingoCount++;
+                winPatterns.push(Array.from({length: 5}, (_, i) => ({row: i, col: 4 - i})));
+            }
+
+            if (bingoCount > 0) {
+                 winPatterns.flat().forEach(({row, col}) => {
+                    const cell = bingoBoard.querySelector(`[data-row='${row}'][data-col='${col}']`);
+                    if(cell) cell.classList.add('win-line');
+                });
+            }
+
+            if (bingoCount >= 5 && !gameEnded) {
+                endGame();
+                setTimeout(() => showModal(), 500);
+            }
+        }
+
+        function endGame() {
+            gameEnded = true;
+            nextWordBtn.disabled = true;
+        }
+
+        function showModal() {
+            bingoModal.classList.remove('hidden');
+        }
+
+        function hideModal() {
+            bingoModal.classList.add('hidden');
+        }
+
+        function resetAll() {
+            hideModal();
+            initGame();
+        }
+
+        // Main Event Listeners
+        startGameBtn.addEventListener('click', handleStartGame);
+        resetBtn.addEventListener('click', resetAll);
+        nextWordBtn.addEventListener('click', handleNextWord);
+        modalResetBtn.addEventListener('click', resetAll);
+        modalCloseBtn.addEventListener('click', hideModal);
+
+        // Initial Game Setup
+        initGame();
+    </script>
+</body>
+</html>
+
